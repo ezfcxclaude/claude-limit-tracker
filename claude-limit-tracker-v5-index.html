@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Limit Tracker</title>
+    <meta property="og:title" content="Claude Limit Tracker">
+    <meta property="og:description" content="Track which Claude account is unlocked">
+    <meta property="og:image" content="thumbnail.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="thumbnail.png">
+    <link rel="icon" type="image/png" href="thumbnail.png">
+    <style>
+        :root {
+            --color-unlocked: #28a745;
+            --color-locked: #dc3545;
+            --color-amber: #ffc107;
+            --color-background: #f4f4f9;
+            --color-surface: #ffffff;
+            --color-text: #212529;
+            --color-text-light: #6c757d;
+            --color-border: #dee2e6;
+            --color-button-primary: #007bff;
+            --color-button-primary-hover: #0056b3;
+            --color-button-secondary: #6c757d;
+            --color-button-secondary-hover: #5a6268;
+            --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --font-family-monospace: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", monospace;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font-family-sans-serif);
+            background-color: var(--color-background);
+            color: var(--color-text);
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .header {
+            position: relative;
+            text-align: center;
+            color: white;
+            background-color: #333;
+        }
+
+        .header img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+            opacity: 0.5;
+        }
+
+        .header h1 {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.7);
+            width: 100%;
+        }
+
+        main {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+
+        .controls-summary {
+            background-color: var(--color-surface);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .summary-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .summary-info h2, .summary-info p {
+            margin: 0;
+        }
+
+        .summary-info h2 {
+            font-size: 1.25rem;
+        }
+        .summary-info p {
+            font-size: 1rem;
+            color: var(--color-text-light);
+        }
+        .summary-info strong {
+            color: var(--color-text);
+            font-weight: 600;
+        }
+
+        .action-button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 6px;
+            border: 1px solid var(--color-button-primary);
+            background-color: var(--color-button-primary);
+            color: white;
+            text-align: center;
+            transition: background-color 0.2s ease;
+        }
+        .action-button:hover {
+            background-color: var(--color-button-primary-hover);
+        }
+
+        #accounts-container {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .account-row {
+            background-color: var(--color-surface);
+            border-radius: 8px;
+            padding: 1rem;
+            display: grid;
+            gap: 1rem;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "email"
+                "status"
+                "actions";
+        }
+
+        .account-email { grid-area: email; word-break: break-all; }
+        .account-status { grid-area: status; }
+        .account-actions { grid-area: actions; }
+
+        .status-pill {
+            display: inline-block;
+            padding: 0.3em 0.8em;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 999px;
+            color: white;
+            text-align: center;
+        }
+
+        .status-pill.unlocked {
+            background-color: var(--color-unlocked);
+        }
+
+        .status-pill.locked {
+            background-color: var(--color-locked);
+        }
+
+        .locked-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .countdown {
+            font-family: var(--font-family-monospace);
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--color-locked);
+        }
+
+        .reset-time {
+            font-size: 0.85rem;
+            color: var(--color-text-light);
+        }
+
+        .account-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-start;
+        }
+
+        .account-button {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .btn-lock {
+            background-color: var(--color-amber);
+            border-color: var(--color-amber);
+            color: #212529;
+        }
+        .btn-lock:hover { background-color: #e0a800; }
+
+        .btn-unlock {
+            background-color: transparent;
+            border-color: var(--color-border);
+            color: var(--color-text-light);
+        }
+        .btn-unlock:hover { background-color: #e9ecef; }
+
+        @media (min-width: 768px) {
+            .header h1 {
+                font-size: 3.5rem;
+            }
+            .account-row {
+                grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) minmax(0, 1.5fr);
+                grid-template-areas: "email status actions";
+                padding: 1rem 1.5rem;
+            }
+            .account-actions {
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <img src="header.png" alt="">
+        <h1>Claude Limit Tracker</h1>
+    </header>
+
+    <main>
+        <div class="controls-summary">
+            <div class="summary-info">
+                <div>
+                    <h2 id="summary-count">-- of 7 Unlocked</h2>
+                    <p id="summary-next-up">Next up: --</p>
+                </div>
+            </div>
+            <button id="resort-btn" class="action-button">Check & Re-sort</button>
+        </div>
+
+        <div id="accounts-container">
+            <!-- Account rows will be generated here -->
+        </div>
+    </main>
+
+    <script>
+        const STORAGE_KEY = 'claudeTrackerData_v4';
+        const ACCOUNTS_CONFIG = [
+            "jordanpaul333@yahoo.com",
+            "maxdave333@yahoo.com",
+            "amanuelamanuel222@gmail.com",
+            "aindirias@gmail.com",
+            "amanuelamanuel778@gmail.com",
+            "indirias.amanuel@gmail.com",
+            "amanlindirias@gmail.com",
+            "cactusjack437@yahoo.com"
+        ];
+        const LOCK_DURATION_MS = 5 * 60 * 60 * 1000;
+
+        let accountsData = [];
+
+        const summaryCountEl = document.getElementById('summary-count');
+        const summaryNextUpEl = document.getElementById('summary-next-up');
+        const accountsContainerEl = document.getElementById('accounts-container');
+        const resortBtnEl = document.getElementById('resort-btn');
+
+        function loadData() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            let parsedData = [];
+            if (savedData) {
+                try {
+                    parsedData = JSON.parse(savedData);
+                } catch (e) {
+                    console.error("Error parsing localStorage data:", e);
+                    parsedData = [];
+                }
+            }
+            
+            accountsData = ACCOUNTS_CONFIG.map(email => {
+                const existingAccount = parsedData.find(acc => acc.email === email);
+                return existingAccount || { email: email, resetTime: null };
+            });
+            saveData();
+        }
+
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(accountsData));
+        }
+        
+        function hitLimit(email) {
+            const account = accountsData.find(acc => acc.email === email);
+            if (account) {
+                account.resetTime = Date.now() + LOCK_DURATION_MS;
+                saveData();
+                renderUI();
+            }
+        }
+
+        function unlockAccount(email) {
+            const account = accountsData.find(acc => acc.email === email);
+            if (account) {
+                account.resetTime = null;
+                saveData();
+                renderUI();
+            }
+        }
+
+        function checkExpiredLocks() {
+            let stateChanged = false;
+            const now = Date.now();
+            accountsData.forEach(account => {
+                if (account.resetTime && account.resetTime <= now) {
+                    account.resetTime = null;
+                    stateChanged = true;
+                }
+            });
+            return stateChanged;
+        }
+
+        function formatResetTime(timestamp) {
+            const resetDate = new Date(timestamp);
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            let dayPrefix = '';
+            if (resetDate.toDateString() === today.toDateString()) {
+                dayPrefix = 'Today';
+            } else if (resetDate.toDateString() === tomorrow.toDateString()) {
+                dayPrefix = 'Tomorrow';
+            } else {
+                dayPrefix = resetDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+
+            const timeString = resetDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            return `${dayPrefix} at ${timeString}`;
+        }
+        
+        function formatCountdown(ms) {
+            if (ms < 0) ms = 0;
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+            const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${hours}:${minutes}:${seconds}`;
+        }
+
+        function renderUI() {
+            // Sort: unlocked first, then locked by soonest reset time
+            accountsData.sort((a, b) => {
+                const aIsLocked = a.resetTime !== null;
+                const bIsLocked = b.resetTime !== null;
+                if (aIsLocked === bIsLocked) {
+                    return aIsLocked ? a.resetTime - b.resetTime : 0;
+                }
+                return aIsLocked ? 1 : -1;
+            });
+
+            // Update Summary
+            const unlockedCount = accountsData.filter(acc => acc.resetTime === null).length;
+            summaryCountEl.textContent = `${unlockedCount} of ${ACCOUNTS_CONFIG.length} Unlocked`;
+            const nextUpAccount = accountsData[0]?.resetTime === null ? accountsData[0].email : "None";
+            summaryNextUpEl.innerHTML = `Next up: <strong>${nextUpAccount}</strong>`;
+
+            // Render Accounts
+            accountsContainerEl.innerHTML = '';
+            accountsData.forEach(account => {
+                const isLocked = account.resetTime !== null;
+                
+                const row = document.createElement('div');
+                row.className = 'account-row';
+                row.dataset.email = account.email;
+
+                let statusHTML;
+                if (isLocked) {
+                    const remainingMs = account.resetTime - Date.now();
+                    statusHTML = `
+                        <div class="locked-details">
+                            <span class="status-pill locked">Locked</span>
+                            <span class="countdown">${formatCountdown(remainingMs)}</span>
+                            <span class="reset-time">Until ${formatResetTime(account.resetTime)}</span>
+                        </div>
+                    `;
+                } else {
+                    statusHTML = '<span class="status-pill unlocked">Unlocked</span>';
+                }
+
+                row.innerHTML = `
+                    <div class="account-email">${account.email}</div>
+                    <div class="account-status">${statusHTML}</div>
+                    <div class="account-actions">
+                        <button class="account-button btn-lock">Hit Limit</button>
+                        <button class="account-button btn-unlock">Unlock</button>
+                    </div>
+                `;
+
+                accountsContainerEl.appendChild(row);
+
+                row.querySelector('.btn-lock').addEventListener('click', () => hitLimit(account.email));
+                row.querySelector('.btn-unlock').addEventListener('click', () => unlockAccount(account.email));
+            });
+        }
+        
+        function tick() {
+            if (checkExpiredLocks()) {
+                saveData();
+                renderUI();
+            } else {
+                // Just update countdowns text if no state changed
+                const now = Date.now();
+                accountsData.forEach(account => {
+                    if (account.resetTime !== null) {
+                        const rowEl = accountsContainerEl.querySelector(`[data-email="${account.email}"]`);
+                        if (rowEl) {
+                            const countdownEl = rowEl.querySelector('.countdown');
+                            if (countdownEl) {
+                                countdownEl.textContent = formatCountdown(account.resetTime - now);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function manualCheckAndResort() {
+            checkExpiredLocks();
+            saveData();
+            renderUI();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            renderUI();
+            setInterval(tick, 1000);
+            resortBtnEl.addEventListener('click', manualCheckAndResort);
+        });
+
+    </script>
+
+</body>
+</html>
+
